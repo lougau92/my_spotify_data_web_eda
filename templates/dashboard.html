@@ -1,0 +1,11 @@
+{% extends "common.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+    <p><br><br><br><br><br><br><br><br></p>
+    <h1>Data Dashboard</h1>
+    {% for figure in figures %}
+        {{ figure|safe }}
+    {% endfor %}
+{% endblock %}

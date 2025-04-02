@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>
+      {% block title %}
+
+      {% endblock %}
+    </title>
+  </head>
+  <body>
+    {% block content %}
+
+    {% endblock %}
+
+    <script>
+        // Update countdown every second
+        let remainingTime = {{ remaining_time|round|int }};
+        // Update countdown every second
+        const countdownElement = document.getElementById('time');
+
+        function updateCountdown() {
+            fetch('/remaining-time')
+                .then(response => response.json())
+                .then(data => {
+                    const remainingTime = Math.round(data.remaining_time);
+                    countdownElement.textContent = remainingTime;
+                    
+                    if (remainingTime <= 0) {
+                        clearInterval(timer);
+                        window.close()
+                    }
+                })
+                .catch(error => console.error("Failed to fetch time:", error));
+        }
+
+        // Start the timer
+        const timer = setInterval(updateCountdown, 500);
+
+        // Notify server when the page loads
+        fetch('/window-opened', { method: 'POST' })
+            .catch(() => {});  // Ignore errors (e.g., if server is already shutting down)
+
+        // Notify server when the page is closed
+        window.addEventListener('beforeunload', () => {
+            navigator.sendBeacon('/window-closed');
+        });
+    </script>
+  </body>
+</html>
