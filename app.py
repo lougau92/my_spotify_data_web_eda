@@ -1,4 +1,4 @@
-from data_figures import build_figures
+from src.data_figures import build_figures
 from flask import Flask, render_template, request, redirect, url_for, jsonify
 import os
 import json
