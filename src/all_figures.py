@@ -6,6 +6,7 @@ import json
 from datetime import datetime
 import plotly.express as px
 import plotly.graph_objects as go
+from sklearn.linear_model import LinearRegression
 
 # Style configuration
 color_palette = px.colors.qualitative.Plotly
@@ -29,9 +30,10 @@ common_layout = dict(
     margin=dict(l=50, r=50, b=50, t=80, pad=10),
 )
 
+
 # Distribution of Song Play Counts: Percentage of songs by how many times they were played
 def create_play_count_distribution(song_play_counts):
-# Create bins: 1, 2, 3, 4, 5, 6+
+    # Create bins: 1, 2, 3, 4, 5, 6+
     song_play_counts["play_count_grouped"] = song_play_counts["play_count"].apply(
         lambda x: f"6+" if x >= 6 else str(x)
     )
@@ -100,9 +102,10 @@ def create_play_count_distribution(song_play_counts):
 
     return fig
 
+
 # Song Duration Distribution How long are the songs you listen to?
 def create_duration_distribution(df_songs):
-# Convert to minutes for more intuitive interpretation
+    # Convert to minutes for more intuitive interpretation
     duration_min = df_songs["secondsPlayed"] / 60
 
     fig = px.histogram(
@@ -149,9 +152,10 @@ def create_duration_distribution(df_songs):
 
     return fig
 
+
 # Top {n} Most Played Artists
 def create_top_artists_bar(df_songs, top_artists, n):
- # Create consistent color mapping for artists
+    # Create consistent color mapping for artists
     artist_colors = {
         artist: color_palette[i % len(color_palette)]
         for i, artist in enumerate(
@@ -185,9 +189,10 @@ def create_top_artists_bar(df_songs, top_artists, n):
 
     return fig, artist_colors  # Return color mapping for reuse
 
+
 # Most Played Artist Per Month
 def create_top_artist_monthly(artist_monthly, artist_colors):
- # Get top artist per month
+    # Get top artist per month
     top_artists_monthly = artist_monthly.loc[
         artist_monthly.groupby("month_year")["count"].idxmax()
     ]
@@ -214,14 +219,15 @@ def create_top_artist_monthly(artist_monthly, artist_colors):
         xaxis_title="<b>Month</b>",
         yaxis_title="<b>Number of Plays</b>",
         legend_title="Artist",
-        bargap=0.2
+        bargap=0.2,
     )
 
     return fig
 
+
 # Listening Patterns of Top Artists Over Time: Weekly aggregated plays
 def create_artist_topic_river(df_artist_plays, artist_colors):
-# Prepare data for plotting
+    # Prepare data for plotting
     df_plot = df_artist_plays.reset_index().melt(
         id_vars="date", var_name="artist", value_name="plays"
     )
@@ -248,14 +254,15 @@ def create_artist_topic_river(df_artist_plays, artist_colors):
         xaxis_title="<b>Date</b>",
         yaxis_title="<b>Number of Plays</b>",
         legend_title="Artist",
-        hovermode="x unified"
+        hovermode="x unified",
     )
 
     return fig
 
+
 # Top {n} Most Played Tracks
 def create_top_track_bar(df_songs, top_tracks, n):
-# Create consistent color mapping for artists
+    # Create consistent color mapping for artists
     track_colors = {
         artist: color_palette[i % len(color_palette)]
         for i, artist in enumerate(
@@ -289,9 +296,10 @@ def create_top_track_bar(df_songs, top_tracks, n):
 
     return fig, track_colors
 
+
 # Most Played Track Per Month
 def create_top_track_monthly(track_monthly, track_colors):
-# Get top track per month
+    # Get top track per month
     top_tracks_monthly = track_monthly.loc[
         track_monthly.groupby("month_year")["count"].idxmax()
     ]
@@ -318,14 +326,15 @@ def create_top_track_monthly(track_monthly, track_colors):
         xaxis_title="<b>Month</b>",
         yaxis_title="<b>Number of Plays</b>",
         legend_title="Track",
-        bargap=0.2
+        bargap=0.2,
     )
 
     return fig
 
+
 # Listening Patterns of Top Tracks Over Time: Weekly aggregated plays
 def create_artist_topic_river(df_track_plays, track_colors):
-# Prepare data for plotting
+    # Prepare data for plotting
     df_plot = df_track_plays.reset_index().melt(
         id_vars="date", var_name="track", value_name="plays"
     )
@@ -352,14 +361,15 @@ def create_artist_topic_river(df_track_plays, track_colors):
         xaxis_title="<b>Date</b>",
         yaxis_title="<b>Number of Plays</b>",
         legend_title="Track",
-        hovermode="x unified"
+        hovermode="x unified",
     )
 
     return fig
 
-# Yearly Listening Distribution: Percentage of total listening time by year 
+
+# Yearly Listening Distribution: Percentage of total listening time by year
 def create_yearly_listening_pie(yearly_listening):
- # Calculate percentage for annotation
+    # Calculate percentage for annotation
     total_hours = yearly_listening["hours_played"].sum()
 
     fig = px.pie(
@@ -400,9 +410,55 @@ def create_yearly_listening_pie(yearly_listening):
 
     return fig
 
+
+def compute_listening_trend(daily_listening, threshold=0.01, period=12 * 30):
+    """
+    Compute the overall listening trend (negative, stable, positive) based on the slope of the 30-day average.
+
+    Parameters:
+    - daily_listening: DataFrame containing 'date' and '30_day_avg' columns
+    - threshold: absolute slope value below which the trend is considered 'stable'
+
+    Returns:
+    - 'negative' if slope is significantly negative
+    - 'stable' if slope is around zero
+    - 'positive' if slope is significantly positive
+    """
+    # Ensure the data is sorted by date
+    df = daily_listening.sort_values("date").dropna(subset=["30_day_avg"])
+
+    if len(df) < 2:
+        return "stable"  # not enough data
+    else:
+        print("Data length:", len(df))
+        print("Total: ", len(daily_listening["30_day_avg"]))
+
+    start_date = df["date"].iloc[-1] - pd.DateOffset(days=period)
+    recent_data = df.loc[(df["date"] >= start_date)]
+
+    # Convert dates to numerical values (days since first date)
+    x = (recent_data["date"] - recent_data["date"].iloc[0]).dt.days.values.reshape(
+        -1, 1
+    )
+    y = recent_data["30_day_avg"].values
+
+    # Fit linear regression
+    model = LinearRegression()
+    model.fit(x, y)
+    slope = model.coef_[0]
+
+    # Determine trend based on threshold
+    if slope < -threshold:
+        return -1
+    elif slope > threshold:
+        return 1
+    else:
+        return 0
+
+
 # Daily Listening hours and a 30-day moving average
 def create_daily_listening_trends(daily_listening):
- # Create the figure with modified 15-day average opacity
+    # Create the figure with modified 15-day average opacity
     fig = px.line(
         daily_listening,
         x="date",
@@ -478,9 +534,10 @@ def create_daily_listening_trends(daily_listening):
 
     return fig
 
-# Monthly Listening Trends by Year: Patterns across different months    
+
+# Monthly Listening Trends by Year: Patterns across different months
 def create_monthly_trends_plot(monthly_listening, month_order):
-# Create the figure with consistent color palette
+    # Create the figure with consistent color palette
     fig = px.line(
         monthly_listening,
         x="month",
@@ -551,9 +608,10 @@ def create_monthly_trends_plot(monthly_listening, month_order):
 
     return fig
 
+
 # Weekly Listening Trends by Year: Patterns throughout the year
 def create_weekly_trends_plot(weekly_listening):
-# Create the figure with consistent styling
+    # Create the figure with consistent styling
     fig = px.line(
         weekly_listening[1:-1],  # Still trimming incomplete edge weeks
         x="week",
@@ -634,9 +692,10 @@ def create_weekly_trends_plot(weekly_listening):
 
     return fig
 
+
 # Average Daily Listening by Day of the Week
 def create_dow_listening_plot(daily_listening, day_order):
- # Prepare data
+    # Prepare data
     day_of_the_week_listening = (
         daily_listening.groupby("day_of_week")["hours_played"]
         .mean()
@@ -714,9 +773,10 @@ def create_dow_listening_plot(daily_listening, day_order):
 
     return fig
 
+
 # Average Listening Time by Hour of Day: Normalized by total number of days
 def create_hourly_listening_plot(df):
-# Convert seconds to minutes
+    # Convert seconds to minutes
     divMin = lambda x: x / 60
 
     # Calculate total listening time per hour
@@ -730,17 +790,12 @@ def create_hourly_listening_plot(df):
     hourly_data = plays_per_hour.reset_index()
     hourly_data.columns = ["hour", "avg_minutes"]
 
-    # Create color gradient (cool to warm)
-    colors = px.colors.sequential.Teal_r + px.colors.sequential.Oranges[1:]
-
-    fig = px.bar(
+    fig = px.line(
         hourly_data,
         x="hour",
         y="avg_minutes",
         title="<b>Average Listening Time by Hour of Day</b><br><sup>Normalized by total number of days</sup>",
         labels={"avg_minutes": "Listening Time (min)", "hour": "Hour of Day"},
-        color="avg_minutes",
-        color_continuous_scale=colors,
     )
 
     # Update traces
@@ -764,7 +819,6 @@ def create_hourly_listening_plot(df):
             "gridwidth": 0.5,
         },
         coloraxis_showscale=False,  # Hide color scale since hours are ordered
-        bargap=0.05,
     )
 
     # Add average line
@@ -791,9 +845,10 @@ def create_hourly_listening_plot(df):
 
     return fig
 
+
 # Weekly Listening Patterns: Average minutes per hour by day of week
 def create_hourly_heatmap(df, day_order):
-   # Convert seconds to minutes
+    # Convert seconds to minutes
     divMin = lambda x: x / 60
 
     # Prepare data
@@ -843,9 +898,10 @@ def create_hourly_heatmap(df, day_order):
 
     return fig
 
+
 # Weekday vs Weekend Listening Patterns: Average minutes per hour
 def create_weekday_weekend_comparison(hourly_by_day):
- # Create weekday/weekend flag
+    # Create weekday/weekend flag
     hourly_by_day["is_weekend"] = hourly_by_day["day_of_week"].isin(
         ["Saturday", "Sunday"]
     )
@@ -918,9 +974,10 @@ def create_weekday_weekend_comparison(hourly_by_day):
 
     return fig
 
+
 # Top {n} Nighttime Artists ({start_h}-{end_h} AM)
 def create_nighttime_artists_plot(df, start_h=0, end_h=5, n=10):
-# Filter nighttime listens
+    # Filter nighttime listens
     night_listens = df[df["hour"].between(start_h, end_h)]
 
     # Get top artists
@@ -960,9 +1017,10 @@ def create_nighttime_artists_plot(df, start_h=0, end_h=5, n=10):
 
     return fig
 
+
 # Top {n} Nighttime Tracks ({start_h}-{end_h} AM)
 def create_nighttime_tracks_plot(df, start_h=0, end_h=5, n=10):
- # Filter nighttime listens
+    # Filter nighttime listens
     night_listens = df[df["hour"].between(start_h, end_h)]
 
     # Get top tracks
@@ -1003,9 +1061,10 @@ def create_nighttime_tracks_plot(df, start_h=0, end_h=5, n=10):
 
     return fig
 
+
 # Nighttime Listening Activity ({start_h}-{end_h} AM): Daily patterns with highlighted peak nights
 def create_nighttime_activity_plot(night_listens, start_h=0, end_h=5):
-   # Prepare data - count tracks per night
+    # Prepare data - count tracks per night
     night_counts = (
         night_listens.resample("D", on="endTime")
         .size()
