@@ -1,10 +1,10 @@
 {% extends "common.html" %}
 
-{% block title %}Dashboard{% endblock %}
+{% block title %}My Spotify Data Dashboard{% endblock %}
 
 {% block content %}
     <p><br><br><br><br><br><br><br><br></p>
-    <h1>Data Dashboard</h1>
+    <h1>My Spotify Data Dashboard</h1>
     {% for figure in figures %}
         {{ figure|safe }}
     {% endfor %}
