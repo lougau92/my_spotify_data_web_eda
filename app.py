@@ -23,7 +23,7 @@ def graceful_shutdown():
     print("grace")
     global shutdown_flag
     shutdown_flag = True
-    time.sleep(1.1)  # Small delay to ensure response is sent
+    time.sleep(30.0)  # Small delay to ensure response is sent
     if shutdown_flag:
         shutdown_flag = False  # ensure that there is only one kill call
         print("Server shutting down...")
